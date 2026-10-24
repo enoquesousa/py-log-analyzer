@@ -8,7 +8,7 @@
   <br>
 
 [![CI](https://github.com/enoquesousa/py-log-analyzer/actions/workflows/ci.yml/badge.svg)](https://github.com/enoquesousa/py-log-analyzer/actions/workflows/ci.yml)
-[![Python](https://img.shields.io/badge/Python-3.10%2B-blue?style=flat&logo=python&logoColor=white)](https://github.com/enoquesousa/py-log-analyzer/blob/master/pyproject.toml)
+[![Python](https://img.shields.io/badge/Python-3.11%2B-blue?style=flat&logo=python&logoColor=white)](https://github.com/enoquesousa/py-log-analyzer/blob/master/setup.py)
 [![Rich](https://img.shields.io/badge/rich-15.0%2B-green?style=flat&logo=python&logoColor=white)](https://github.com/Textualize/rich)
 [![License](https://img.shields.io/github/license/enoquesousa/py-log-analyzer)](https://github.com/enoquesousa/py-log-analyzer/blob/master/LICENSE)
 [![Last Commit](https://img.shields.io/github/last-commit/enoquesousa/py-log-analyzer)](https://github.com/enoquesousa/py-log-analyzer/commits/master)
@@ -54,14 +54,14 @@ py-log-analyzer access.log --format html --threshold 2.5
 | Security | Anomaly detection for suspicious IPs (401/404 spikes). |
 | GeoIP | Optional **country** labels and request totals per country using GeoLite2-Country (local `.mmdb` file). |
 | Health | Service health monitoring with configurable 5xx error thresholds. |
-| Export | Interactive **HTML reports** with Chart.js or structured **JSON**. |
+| Export | Self-contained, offline **HTML reports** with bundled Chart.js or structured **JSON**. |
 | UI | Elegant terminal tables and panels powered by `rich`. |
 
 ## Tech stack
 
 | Component | Role |
 | --------- | ---- |
-| Python 3.10+ | Language and runtime |
+| Python 3.11+ | Language and runtime |
 | rich | Terminal UI and tables |
 | geoip2 | MaxMind GeoIP database reader (GeoLite2-Country) |
 | Chart.js | Interactive HTML visualizations |
@@ -69,7 +69,9 @@ py-log-analyzer access.log --format html --threshold 2.5
 
 ## Prerequisites
 
-- Python **3.10+** and `pip`.
+- Python **3.11+** and `pip`. Python 3.10 reached end of life on
+  [2026-10-01](https://peps.python.org/pep-0619/#lifespan); upgrade the interpreter
+  before installing this version. The Docker image uses Python 3.12.
 - Optional: **Docker** for containerized execution.
 - Optional: **GeoLite2-Country** database (`GeoLite2-Country.mmdb`) from MaxMind for geographic analysis (see [GeoIP](#geoip-traffic-by-country)).
 
@@ -130,6 +132,29 @@ py-log-analyzer access.log --geoip-db "D:\data\GeoLite2-Country.mmdb" --format j
 
 Omit `--geoip-db` to run without geographic enrichment (same behavior as before GeoIP was added).
 
+## Security and report privacy
+
+This is a local CLI: it has no login, session, API listener, or runtime access
+token. It reads the files you select under your operating-system permissions.
+GeoIP uses a local database; the analyzer does not need a MaxMind account or
+license key at runtime.
+
+Treat logs as untrusted data. HTML export escapes report values and embeds a
+versioned copy of Chart.js, so opening a newly generated report does not fetch
+code from a CDN. The report's Content Security Policy restricts scripts and
+outbound connections. Terminal output also treats log fields as literal text.
+
+Reports still contain IPs, paths, and possibly query parameters carrying
+credentials or personal data. Neither HTML nor JSON export automatically
+redacts these values or encrypts the output. Keep reports private, review them
+before sharing, and protect the source logs and output directory with suitable
+file permissions. Regenerate old HTML reports to receive the output protections.
+
+Unreadable files and invalid UTF-8 make the command fail before generating a
+partial report. Lines that do not match the supported CLF pattern are still
+skipped; totals count recognized entries. See the
+[security and data-flow documentation](docs/security.md) for the exact limits.
+
 ## Documentation
 
 | Document | Contents |
@@ -137,6 +162,7 @@ Omit `--geoip-db` to run without geographic enrichment (same behavior as before 
 | [LICENSE](LICENSE) | MIT License |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Contribution guidelines |
 | [CHANGELOG.md](CHANGELOG.md) | Version history |
+| [Security model](docs/security.md) | Request flow, credentials, report boundaries, and validation |
 
 ## CLI summary
 
@@ -168,7 +194,7 @@ pytest --cov=py_log_analyzer
 | Symptom | Likely cause | What to do |
 | ------- | ------------- | ---------- |
 | `ModuleNotFoundError` | Package not installed | Run `pip install .` or `pip install -e .` |
-| `Permission Denied` | File access issues | Check log file permissions or use `sudo` if necessary. |
+| File cannot be read | Missing file, insufficient permissions, or invalid UTF-8 | Confirm the selected paths and encoding, and grant only the access needed to read the logs. The command fails without exporting partial results. |
 | `MemoryError` | Large file loading | The tool uses generators, but check if `--format html` with extreme log sizes is a factor. |
 | GeoIP shows no countries / errors opening DB | Wrong path, missing file, or not the Country MMDB | Use the full path to `GeoLite2-Country.mmdb`; ensure the file is readable by the process (and mounted in Docker if applicable). |
 

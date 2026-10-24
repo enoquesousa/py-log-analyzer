@@ -1,0 +1,37 @@
+{
+  "name": "chart.js",
+  "version": "4.6.1",
+  "license": "MIT",
+  "registry_metadata": "https://registry.npmjs.org/chart.js/4.6.1",
+  "source_repository": "https://github.com/chartjs/Chart.js",
+  "release": "https://github.com/chartjs/Chart.js/releases/tag/v4.6.1",
+  "tarball": "https://registry.npmjs.org/chart.js/-/chart.js-4.6.1.tgz",
+  "npm_integrity": "sha512-hJyniucsFmq//EvXYvJ6c6mahPoI3kaxdjVH8awTaJ/fDNWeSqqqArixMJWkWNN6fcYvPU3HneSANFNYtRi61g==",
+  "npm_shasum": "40a924bc0b92544ed66fa3f4873981152fc62c52",
+  "files": {
+    "chart.umd-4.6.1.js": {
+      "upstream_path": "package/dist/chart.umd.js",
+      "bytes": 210078,
+      "sha256": "338399fb5bafe598d21cfc471b0590b61ceb321a985fade4f68499b151f67fbf"
+    },
+    "Chart.js-LICENSE.md": {
+      "upstream_path": "package/LICENSE.md",
+      "bytes": 1093,
+      "sha256": "41a84aa2caba645f966a18d9c2056b73e6d3a81d80bc0046bc0011a2634d4cce"
+    }
+  },
+  "vendoring": "Files are byte-for-byte copies from the official npm tarball, verified against its published SHA512 integrity and SHA1 shasum. No npm install or package scripts were executed.",
+  "report_embedding": "The exporter embeds the license and UMD source, omitting its trailing sourceMappingURL comment to keep the generated report self-contained.",
+  "bundled_color": {
+    "name": "@kurkle/color",
+    "version": "0.3.2",
+    "license": "MIT",
+    "registry_metadata": "https://registry.npmjs.org/@kurkle%2fcolor/0.3.2",
+    "tarball": "https://registry.npmjs.org/@kurkle/color/-/color-0.3.2.tgz",
+    "npm_integrity": "sha512-fuscdXJ9G1qb7W8VdHi+IwRqij3lBkosAm4ydQtEmbY58OzHXqQhvlxqEkoz0yssNVn38bcpRWgA9PP+OGoisw==",
+    "npm_shasum": "5acd38242e8bde4f9986e7913c8fdf49d3aa199f",
+    "license_file": "kurkle-color-LICENSE.md",
+    "license_sha256": "2859c50313bad2ba77b081410c477beaf92b60ca13a77a248d89859a6dd6ac81",
+    "qualification": "Version is the embedded UMD copyright banner; no additional color code is vendored."
+  }
+}

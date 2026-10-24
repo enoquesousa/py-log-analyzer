@@ -1,15 +1,28 @@
 import argparse
 import multiprocessing
+import unicodedata
 from collections import Counter
 
 import geoip2.database
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
+from rich.text import Text
 
 from .analyzer import detect_anomalies, get_status_categories, process_file
 from .exporter import export_html, export_json
 from .geoip import enrich_ip_geo
+from .parser import LogReadError
+
+
+def _terminal_text(value):
+    """Render external fields literally and expose terminal/format controls.
+
+    Only presentation is changed: the aggregate and exported data retain their
+    original strings. Text avoids Rich markup and hyperlink interpretation.
+    """
+    visible = "".join(character.encode("unicode_escape").decode("ascii") if unicodedata.category(character) in {"Cc", "Cf", "Zl", "Zp"} else character for character in value)
+    return Text(visible)
 
 
 def build_report_data(merged_data, error_threshold_5xx, geo_reader=None):
@@ -84,10 +97,10 @@ def display_summary(merged_data, error_threshold_5xx, export_format=None, geo_re
             table.add_column("Country", style="yellow")
             detail_by_ip = {row["ip"]: row["country"] for row in report_data["anomalies_detail"]}
             for ip, count in anomalies.items():
-                table.add_row(ip, str(count), detail_by_ip.get(ip, "Unknown"))
+                table.add_row(_terminal_text(ip), str(count), _terminal_text(detail_by_ip.get(ip, "Unknown")))
         else:
             for ip, count in anomalies.items():
-                table.add_row(ip, str(count))
+                table.add_row(_terminal_text(ip), str(count))
         console.print(table)
     else:
         console.print("[bold green]No IP anomalies detected (threshold > 50 errors).[/bold green]")
@@ -106,10 +119,10 @@ def display_summary(merged_data, error_threshold_5xx, export_format=None, geo_re
     if report_data["geo_enabled"]:
         ip_table.add_column("Country", style="yellow")
         for row in report_data["top_ips"]:
-            ip_table.add_row(row["ip"], str(row["requests"]), row["country"])
+            ip_table.add_row(_terminal_text(row["ip"]), str(row["requests"]), _terminal_text(row["country"]))
     else:
         for row in report_data["top_ips"]:
-            ip_table.add_row(row["ip"], str(row["requests"]))
+            ip_table.add_row(_terminal_text(row["ip"]), str(row["requests"]))
 
     geo_table = None
     if report_data["geo_enabled"] and report_data["country_distribution"]:
@@ -117,7 +130,7 @@ def display_summary(merged_data, error_threshold_5xx, export_format=None, geo_re
         geo_table.add_column("Country", style="cyan")
         geo_table.add_column("Requests", justify="right", style="magenta")
         for country, cnt in list(report_data["country_distribution"].items())[:15]:
-            geo_table.add_row(country, str(cnt))
+            geo_table.add_row(_terminal_text(country), str(cnt))
 
     status_table = Table(title="Requests by Status Code")
     status_table.add_column("Category", style="green")
@@ -129,7 +142,7 @@ def display_summary(merged_data, error_threshold_5xx, export_format=None, geo_re
     url_table.add_column("Path", style="blue")
     url_table.add_column("Requests", justify="right", style="magenta")
     for url, count in report_data["top_paths"]:
-        url_table.add_row(url, str(count))
+        url_table.add_row(_terminal_text(url), str(count))
 
     console.print(ip_table)
     if geo_table is not None:
@@ -182,6 +195,8 @@ def run():
             merged_data["total_count"] += res["total_count"]
 
         display_summary(merged_data, args.threshold, args.format, geo_reader)
+    except LogReadError:
+        parser.exit(2, "error: Could not read all input log files as UTF-8; no report was generated.\n")
     finally:
         if geo_reader is not None:
             geo_reader.close()

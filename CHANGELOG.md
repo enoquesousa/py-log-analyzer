@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Security
+
+- Escape untrusted report fields in HTML and serialize chart data safely so a
+  request path or country label cannot insert HTML or terminate a script block.
+- Bundle a versioned, licensed Chart.js build in the package and generated HTML.
+  Reports remain interactive offline, with a restrictive Content Security Policy
+  and no runtime CDN script. Regenerate existing HTML reports to apply the fix.
+- Render external terminal fields as literal text rather than Rich markup.
+- CI uses read-only repository permissions and does not persist checkout
+  credentials. Coverage stays in GitHub artifacts instead of an external upload.
+
+### Fixed
+
+- Fail on unreadable or invalid UTF-8 input before showing or exporting a
+  misleading partial report. Existing output files are left unchanged on input
+  failure; malformed CLF lines continue to be skipped.
+- Preserve the legacy `[IP, count]` form when exporting older report data,
+  alongside the current dictionary form with optional country labels.
+
+### Changed
+
+- Require Python 3.11 or newer and use Python 3.12 in Docker. Python 3.10 reached
+  end of life on 2026-10-01. CI covers Python 3.11, 3.12, and 3.13.
+
+
 ## [1.0.0] - 2026-05-04
 
 ### Added
