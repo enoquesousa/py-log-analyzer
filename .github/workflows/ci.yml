@@ -2,49 +2,132 @@ name: Python CI
 
 on:
   push:
-    branches: [ master ]
+    branches: [master]
   pull_request:
-    branches: [ master ]
+    branches: [master]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: python-ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
 
     - name: Set up Python
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
       with:
-        python-version: '3.10'
-        cache: 'pip'
+        python-version: ${{ matrix.python-version }}
+        cache: pip
 
     - name: Install dependencies
       run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install -r requirements-dev.txt
+        python -m pip install --upgrade pip setuptools wheel
+        python -m pip install -r requirements.txt -r requirements-dev.txt
+        python -m pip install build==1.6.1 pip-audit==2.10.1
+        python -m pip check
 
     - name: Lint with Ruff
-      run: ruff check .
+      run: python -m ruff check .
 
     - name: Security scan with Bandit
-      run: bandit -r . -x ./tests
+      run: python -m bandit -r . -x ./tests
 
     - name: Run tests with Pytest
-      run: pytest --cov=py_log_analyzer --cov-report=xml
+      run: python -m pytest --cov=py_log_analyzer --cov-report=xml
       env:
         PYTHONPATH: .
 
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v4
+    # Audit the exact installed third-party graph, including transitives and
+    # tooling. The repository's own package is reviewed from source, not PyPI.
+    - name: Audit installed dependencies
+      run: |
+        python -m pip freeze --all --exclude py-log-analyzer > audited-requirements.txt
+        python -m pip_audit --strict --disable-pip --no-deps -r audited-requirements.txt --format json --output audit.json
+
+    # Build the wheel from the source distribution so missing package data is
+    # detected before publishing or distributing either format.
+    - name: Build source distribution and wheel
+      run: python -m build
+
+    - name: Install the built wheel
+      run: python -m pip install --force-reinstall --no-deps dist/*.whl
+
+    - name: Verify the installed report assets
+      working-directory: ${{ runner.temp }}
+      run: |
+        python - <<'PY'
+        import hashlib
+        import json
+        import sys
+        import tempfile
+        from importlib.resources import files
+        from pathlib import Path
+
+        import py_log_analyzer
+        from py_log_analyzer.exporter import export_html
+
+        assert Path(py_log_analyzer.__file__).is_relative_to(Path(sys.prefix))
+        assets = files("py_log_analyzer").joinpath("assets")
+        manifest = json.loads(assets.joinpath("chartjs-integrity.json").read_text(encoding="utf-8"))
+        for name, expected in manifest["files"].items():
+            content = assets.joinpath(name).read_bytes()
+            assert hashlib.sha256(content).hexdigest() == expected["sha256"]
+        color = manifest["bundled_color"]
+        assert hashlib.sha256(assets.joinpath(color["license_file"]).read_bytes()).hexdigest() == color["license_sha256"]
+
+        report = {
+            "total_requests": 1, "status_distribution": {"2xx": 1},
+            "top_ips": [{"ip": "127.0.0.1", "requests": 1}],
+            "top_paths": [["/fixture", 1]], "anomalies": {},
+            "is_critical": False, "error_rate": 0.0, "rate_5xx": 0.0,
+            "threshold": 5.0,
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "report.html"
+            export_html(report, output)
+            html = output.read_text(encoding="utf-8")
+            assert "Content-Security-Policy" in html
+            assert "Chart.js" in html
+            assert "/fixture" in html
+        print("Installed wheel: report generation and vendored asset hashes verified.")
+        PY
+
+    # Coverage and packages stay in this GitHub workflow. No third-party
+    # coverage service receives source paths, reports, or credentials.
+    - name: Retain coverage, audit and packages
+      if: matrix.python-version == '3.12'
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
-        file: ./coverage.xml
-        fail_ci_if_error: false
+        name: validation-python-312
+        path: |
+          coverage.xml
+          audit.json
+          audited-requirements.txt
+          dist/*
+        if-no-files-found: error
+        retention-days: 14
 
   docker:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
 
     - name: Build Docker image
       run: docker build . -t py-log-analyzer:latest
